@@ -5,21 +5,134 @@ output:
     keep_md: true
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
 ## Loading and preprocessing the data
-
+```{r, results = "hide"}
+activity <- read.csv("activity.csv")
+library("dplyr")
+library("ggplot2")
+```
 
 
 ## What is mean total number of steps taken per day?
+```{r}
+daily.steps <- as.numeric((activity %>% group_by(date) 
+                           %>% summarise(Freq = sum(steps))) 
+                                %>% pull(Freq))
+
+hist(daily.steps, main = "Daily Steps Histogram", xlab = "Daily Steps", 
+        ylim = c(0,30))
+
+mean.steps <- mean(daily.steps, na.rm = TRUE)
+median.steps <- median(daily.steps, na.rm = TRUE)
+```
+
+```{r}
+mean.steps
+```
+
+```{r}
+median.steps
+```
 
 
 
 ## What is the average daily activity pattern?
+```{r}
+pattern.steps <- as.numeric(activity %>% group_by(interval)
+                                %>% summarise(average = mean(steps, na.rm = TRUE))
+                                        %>% pull(average))
 
 
+plot(x = activity[(1:(length(pattern.steps))),3], y = pattern.steps, type = "l",
+        xlab = "Minutes", ylab = "Average Steps")
+
+max(pattern.steps)
+
+## Which interval has the highest number of steps, on average:
+which.max(pattern.steps)
+```
 
 ## Imputing missing values
+```{r}
+## 1. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
 
+sum(is.na(activity))
+
+## 2, 3. Devise a strategy for filling in all of the missing values in the dataset. Impute those missing values.
+
+
+#### using the mean steps for each time interval from other days without NA's to impute missing values
+
+## data frame containing the means for each time interval and the time of their respective intervals
+imputable.means <- data.frame(pattern.steps, activity[(1:(length(pattern.steps))),3])  
+colnames(imputable.means) <- c("steps", "interval")   
+
+activity.impute <- activity    ## new data frame to make the imputation changes
+
+for (i in 1:nrow(activity.impute)) {
+        if(sum(is.na(activity.impute[i,])) == 1) {
+                activity.impute[i,1] = (inner_join(activity.impute[i,], imputable.medians, by = "interval")[,4])
+        }}
+```
+
+Daily Steps and Averages re-calculated with imputed data:
+
+```{r}
+daily.steps.alt <- as.numeric((activity.impute %>% group_by(date) 
+                              %>% summarise(Freq = sum(steps))) 
+                             %>% pull(Freq))
+
+
+hist(daily.steps.alt, main = "Daily Steps Histogram", xlab = "Daily Steps", 
+     ylim = c(0,40))
+
+mean.steps.alt <- mean(daily.steps.alt, na.rm = TRUE)
+median.steps.alt <- median(daily.steps.alt, na.rm = TRUE)
+
+mean.steps.alt
+
+median.steps.alt
+
+## mean stays the same. Median is extremely close.
+    ## Middle bar of histogram gets taller (10000-15000 steps)
+```
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+## 1.   Create new variable indicating weekday or weekend (using imputed data)
+ 
+activity.impute <- activity.impute %>% mutate(Day = weekdays(as.Date(activity.impute[,2])))
+
+for (i in 1:nrow(activity.impute)) {
+  if(activity.impute[i,"Day"] != "Saturday" & activity.impute[i,"Day"] != "Sunday") 
+    {activity.impute[i,"Day"] = "weekday"}
+  else {activity.impute[i,"Day"] = "weekend"}
+}
+
+
+## 2. Create two time series plots for average number of steps at each time interval on Weekdays and on weekends
+
+pattern.steps.weekday <- as.numeric(activity.impute %>% group_by(interval)
+                            %>% subset(Day == "weekday")
+                            %>% summarise(average = mean(steps, na.rm = TRUE))
+                            %>% pull(average))
+
+pattern.steps.weekend <- as.numeric(activity.impute %>% group_by(interval)
+                                    %>% subset(Day == "weekend")
+                                    %>% summarise(average = mean(steps, na.rm = TRUE))
+                                    %>% pull(average))
+
+par(mfrow = c(2,1))
+
+plot(x = activity[(1:(length(pattern.steps))),3], y = pattern.steps.weekday, type = "l",
+     xlab = "Interval", ylab = "Average Steps", ylim = c(0, 250), main = "Weekdays")
+plot(x = activity[(1:(length(pattern.steps))),3], y = pattern.steps.weekend, type = "l",
+     xlab = "Interval", ylab = "Average Steps", ylim = c(0, 250), main = "Weekends")
+
+```
